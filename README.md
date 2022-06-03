@@ -21,6 +21,6 @@ usage: python get_url_post.py
 #### 2. Use main.py to obtain the information related to those URLs
 
 ```
-usage: python get_url_post.py 
+usage: python main.py 
 
 ```
