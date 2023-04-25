@@ -12,7 +12,7 @@ mydb = myclient["facebookscraping"]
 
 mycol = mydb["posts"]
 
-
+print('lets add this')
 #ourvir le fichier post_urls pour obtenir les urls
 with open('post_urls.txt') as f:
     #supprimer les \n
