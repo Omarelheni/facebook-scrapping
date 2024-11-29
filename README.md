@@ -2,6 +2,9 @@
 
 Scrape Facebook Public Posts 
 
+## Prerequisites
+* chromedriver
+
 
 ## Install Requirements
 
@@ -11,16 +14,23 @@ pip install -r requirements.txt
 
 ## Usage
 
-#### 1. Use get_url_post.py to grab the URLs of public posts that are related to a specific subject
+#### 1. Create .env file
 
 ```
-usage: python get_url_post.py 
+cp .env.example .env
 
 ```
 
-#### 2. Use main.py to obtain the information related to those URLs
+#### 2. Use get_url_post.py to grab the URLs of public posts that are related to a specific subject
 
 ```
-usage: python main.py 
+python get_url_post.py 
+
+```
+
+#### 3. Use main.py to obtain the information related to those URLs
+
+```
+python main.py 
 
 ```

@@ -1,72 +1,102 @@
-import time,random
-import os
-from bs4 import BeautifulSoup
-from selenium import  webdriver
+import time
+from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-import pandas as pd
-from urllib.request import urlretrieve
+from utils import extract_fbid_and_create_url
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 
-# instancier l'objet du webdriver
-ser = Service("chromedriver.exe")
-op = webdriver.ChromeOptions()
-driver = webdriver.Chrome(service=ser, options=op)
-driver.get('https://www.facebook.com/')
-#Connexion
-file = open('config')
-lines = file.readlines()
-username = lines[0]
-password = lines[1]
-elementIDP = driver.find_element(By.ID,'pass')
-elementIDE = driver.find_element(By.ID,'email')
-elementIDP.send_keys(password)
-elementIDE.send_keys(username)
-time.sleep(7)
+class FacebookURLGetter:
+    def __init__(self, username, password, driver_path='/usr/bin/chromedriver'):
+        self.username = username
+        self.password = password
+        self.driver_path = driver_path
+        self.driver = self._initialize_driver()
+    
+    def _initialize_driver(self):
+        """Initialize the Chrome WebDriver."""
+        ser = Service(self.driver_path)
+        options = webdriver.ChromeOptions()
+        return webdriver.Chrome(service=ser, options=options)
+    
+    def login(self):
+        """Log into Facebook."""
+        self.driver.get('https://www.facebook.com/')
+        time.sleep(2)
+        email_element = self.driver.find_element(By.ID, 'email')
+        password_element = self.driver.find_element(By.ID, 'pass')
+        email_element.send_keys(self.username)
+        password_element.send_keys(self.password)
+        time.sleep(2)
+        password_element.submit()
+        time.sleep(7)  # Wait for login to complete
 
-#selection du sujet 
-topic = 'uclfinal'
-#recherche
-driver.get('https://www.facebook.com/search/posts/?q='+ topic)
-time.sleep(7)
+    def search_posts(self, topic):
+        """Search for posts related to a specific topic."""
+        self.driver.get(f'https://www.facebook.com/search/posts/?q={topic}')
+        time.sleep(7)
+    
+    def scroll_to_bottom(self):
+        """Scroll to the bottom of the page to load more posts."""
+        SCROLL_PAUSE_TIME = 1
+        last_height = self.driver.execute_script("return document.body.scrollHeight")
+        start_time = time.time()
+        print('start_time',start_time)
+        
+        while True:
+            end_time = time.time()
 
-#Scrolling
-SCROLL_PAUSE_TIME = 1
+            if (end_time - start_time) > 120:  # Stop after 2 minutes
+                break
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(SCROLL_PAUSE_TIME)
+            new_height = self.driver.execute_script("return document.body.scrollHeight")
+    
+    def extract_post_links(self):
+        anchors = self.driver.find_elements(By.TAG_NAME,'a')
+        anchors = [a.get_attribute('href') for a in anchors]
 
-last_height = driver.execute_script("return document.body.scrollHeight")
-start = time.time()
+        posts = []
+        anchors = [a for a in anchors if '/photo/' in str(a)]
 
-while True:
-    end = time.time()
-    if (end - start > 120):
-        break 
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        for a in anchors:
+            new_url = extract_fbid_and_create_url(a)
+            if new_url is not None:
+                posts.append(new_url)
+        
+        return list(dict.fromkeys(posts))  # Remove duplicates
+    
+    def save_posts_to_file(self, posts, filename="post_urls.txt"):
+        """Save extracted post URLs to a file."""
+        with open(filename, "w") as f:
+            for post in posts:
+                f.write(post + '\n')  # Append a newline character after each post
 
-    time.sleep(SCROLL_PAUSE_TIME)
+    
+    def close(self):
+        """Close the WebDriver."""
+        self.driver.quit()
 
-    new_height = driver.execute_script("return document.body.scrollHeight")
- 
-    last_height = new_height
+if __name__ == "__main__":
 
-#get the links
-anchors = driver.find_elements(By.TAG_NAME,'a')
-anchors = [a.get_attribute('href') for a in anchors]
+    # Access the variables
+    username = os.getenv("EMAIL")
+    password = os.getenv("PASSWORD")
 
-#réduire tous les liens vers des liens d'images uniquement puisque c'est le seul endroit
-#où j'aurais pu trouver l'url du publication
-posts = []
-anchors = [a for a in anchors if '/photos/pcb.' in str(a)]
-
-for a in anchors:
-    pos2 = ( [pos for pos, char in enumerate(a) if char == '/'])[5]
-    pos1 = ( [pos for pos, char in enumerate(a) if char == '.'])[2]
-    post = a[(pos1 + 1) : pos2]
-    posts.append(post)
-posts = list(dict.fromkeys(posts))
-
-#enregistrer les urls dans un fichier
-for a in posts:
-    with open("post_urls.txt", "a") as f:
-        f.write('https://www.facebook.com/'+a)
-        f.write('\n')
-        f.close()
+    print(f"Username: {username}, Password: {password}")
+    
+    scraper = FacebookURLGetter(username, password)
+    
+    try:
+        scraper.login()
+        topic = 'uclfinal'
+        scraper.search_posts(topic)
+        scraper.scroll_to_bottom()
+        posts = scraper.extract_post_links()
+        print('Extracted posts:', posts)
+        scraper.save_posts_to_file(posts)
+    finally:
+        scraper.close()  # Ensure the driver is closed on completion
